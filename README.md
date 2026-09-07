@@ -1,12 +1,6 @@
 # 🛡️ Sistema de Gestión y Aprobación de Rehabilitación de Pólizas
 
-[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/apps-script)
-
-[![AppSheet](https://img.shields.io/badge/AppSheet-1A73E8?style=for-the-badge&logo=google&logoColor=white)](https://about.appsheet.com/)
-
-[![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=for-the-badge&logo=googleworkspace&logoColor=white)](https://sheets.google.com)
-
-[![JavaScript](https://img.shields.io/badge/Vanilla%20JS-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
+[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/apps-script) [![AppSheet](https://img.shields.io/badge/AppSheet-1A73E8?style=for-the-badge&logo=google&logoColor=white)](https://about.appsheet.com/) [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=for-the-badge&logo=googleworkspace&logoColor=white)](https://sheets.google.com) [![JavaScript](https://img.shields.io/badge/Vanilla%20JS-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
 
 Sistema web para la **gestión, validación, aprobación y seguimiento de solicitudes de rehabilitación de pólizas**, desarrollado sobre **Google Apps Script, Google Sheets y JavaScript Vanilla**.
 
@@ -310,19 +304,11 @@ Se recomienda restringir el acceso a:
 
 ### 1️⃣ 📊 Preparar Google Sheets
 
-Utiliza la plantilla oficial del proyecto.
+Utiliza la plantilla oficial del proyecto (https://docs.google.com/spreadsheets/d/1zWh07krlSkKAp5ZB8EazQ1hJRz5UDF04HzbPbUw22Ic/edit?usp=sharing)
 
 En Google Sheets:
 
 **Archivo → Hacer una copia**
-
-Verifica que exista la pestaña:
-
-```text
-Solicitudes
-```
-
-y que sus columnas coincidan exactamente con el esquema definido anteriormente.
 
 ---
 
@@ -404,25 +390,6 @@ La aplicación estará disponible desde el navegador como una **Web App de Googl
 
 ---
 
-## 📱 AppSheet
-
-El uso de **AppSheet** es opcional y puede utilizarse como complemento para proporcionar una experiencia móvil.
-
-Para crear la aplicación:
-
-**Google Sheets → Extensiones → AppSheet → Crear aplicación**
-
-### ⚙️ Configuración recomendada
-
-- Utilizar **Solicitudes** como fuente principal.
-- Agregar tablas adicionales desde **Data → Tables**.
-- Configurar vistas según el rol.
-- Configurar acciones de aprobación.
-- Aplicar filtros y restricciones de acceso.
-- Configurar las vistas de acuerdo con los perfiles **Solicitante** y **Aprobador**.
-
----
-
 ## 📁 Estructura del Proyecto
 
 ```text
@@ -443,40 +410,6 @@ Para crear la aplicación:
 └── 📄 Estilos.html
     └── Estilos y diseño visual
 ```
-
-### 📄 Código.gs
-
-Contiene la lógica principal del sistema:
-
-- Radicación.
-- Validaciones.
-- Consultas.
-- Actualización de solicitudes.
-- Gestión de estados.
-- Procesamiento.
-
-### 📄 Globales.gs
-
-Contiene:
-
-- Constantes.
-- Configuraciones.
-- Parámetros generales.
-- Variables compartidas.
-
-### 📄 Index.html
-
-Es el punto de entrada de la aplicación web.
-
-### 📄 APP.html
-
-Contiene los componentes principales de la interfaz y las funcionalidades del sistema.
-
-### 📄 Estilos.html
-
-Contiene los estilos visuales utilizados por la aplicación.
-
----
 
 ## 🎯 Resultado
 
@@ -500,48 +433,6 @@ La aplicación estará disponible como una **Web App de Google Apps Script**, co
 - ✅ Optimizar consultas mediante caché.
 
 ---
-
-## 💡 Recomendaciones para Producción
-
-Antes del despliegue definitivo se recomienda validar:
-
-### 🔒 Seguridad
-
-- Permisos de acceso a la Web App.
-- Permisos sobre Google Sheets.
-- Políticas de seguridad de la organización.
-- Usuarios autorizados.
-- Configuración de roles.
-
-### 👥 Usuarios
-
-- Usuarios correctamente registrados.
-- Roles correctamente asignados.
-- Estado de usuario correctamente configurado.
-- Canales correctamente definidos.
-
-### 🔄 Operación
-
-- Pruebas de concurrencia.
-- Pruebas de radicación.
-- Pruebas de aprobación.
-- Pruebas de rechazo.
-- Pruebas de trámite con Operaciones.
-- Pruebas de consulta del historial.
-
-### 💾 Respaldo
-
-Se recomienda establecer mecanismos de:
-
-- Copias de seguridad.
-- Recuperación de información.
-- Control de cambios.
-- Auditoría.
-
-> ⚠️ **Importante:** antes de utilizar el sistema en producción, se recomienda realizar pruebas completas del proceso de **Radicación → Validación → Aprobación/Rechazo → Actualización → Historial**, incluyendo escenarios de acceso simultáneo y usuarios con diferentes roles.
-
----
-
 ## 🛠️ Tecnologías Utilizadas
 
 | Tecnología | Uso |
