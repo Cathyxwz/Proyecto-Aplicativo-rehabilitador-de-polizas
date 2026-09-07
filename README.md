@@ -16,12 +16,9 @@ El sistema permite centralizar el proceso de **radicación y aprobación**, cont
 - 🔐 [Seguridad y Control de Acceso](#-seguridad-y-control-de-acceso)
 - ⚙️ [Instalación y Configuración](#️-instalación-y-configuración)
 - 🌐 [Publicación como Web App](#-publicación-como-web-app)
-- 📱 [AppSheet](#-appsheet)
 - 📁 [Estructura del Proyecto](#-estructura-del-proyecto)
 - 🎯 [Resultado](#-resultado)
-- 💡 [Recomendaciones para Producción](#-recomendaciones-para-producción)
 - 🛠️ [Tecnologías Utilizadas](#️-tecnologías-utilizadas)
-- 📌 [Estado del Proyecto](#-estado-del-proyecto)
 
 ---
 
