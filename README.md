@@ -4,6 +4,7 @@
 [![AppSheet](https://img.shields.io/badge/AppSheet-1A73E8?style=for-the-badge&logo=google&logoColor=white)](https://about.appsheet.com/)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=for-the-badge&logo=googleworkspace&logoColor=white)](https://sheets.google.com)
 [![JavaScript](https://img.shields.io/badge/Vanilla%20JS-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
+
 Un sistema web centralizado, reactivo e interactivo diseñado para la radicación, validación en tiempo real y gestión administrativa de solicitudes de rehabilitación de pólizas. El sistema conecta una interfaz web ligera con Google Sheets / AppSheet, proporcionando trazabilidad, auditoría y control de acceso basado en roles (RBAC).
 
 🚀 Flujo de Trabajo y Funcionalidades
