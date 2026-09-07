@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title>Gestión de rehabilitación de pólizas</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="app-container">
+    <!-- BARRA LATERAL / SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h2>Rehabilitación pólizas</h2>
+      </div>
+      <nav class="sidebar-nav">
+        <button type="button" class="tab-btn tab-solicitud active" onclick="switchTab('tab-solicitud', event)">
+          <div class="tab-icon-box">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+          </div>
+          <div class="tab-btn-content">
+            <span class="tab-btn-title">Nueva solicitud</span>
+            <span class="tab-btn-subtitle">Registrar rehabilitación</span>
+          </div>
+        </button>
+        <button type="button" class="tab-btn tab-bandeja" onclick="switchTab('tab-bandeja', event)">
+          <div class="tab-icon-box">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          </div>
+          <div class="tab-btn-content">
+            <span class="tab-btn-title">Bandeja pendientes</span>
+            <span class="tab-btn-subtitle">Aprobar o rechazar</span>
+          </div>
+        </button>
+        <button type="button" class="tab-btn tab-historial" onclick="switchTab('tab-historial', event)">
+          <div class="tab-icon-box">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div class="tab-btn-content">
+            <span class="tab-btn-title">Historial</span>
+            <span class="tab-btn-subtitle">Consulta de registros</span>
+          </div>
+        </button>
+      </nav>
+      <div class="sidebar-user">
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Usuario activo</div>
+        <div id="userEmailBadge" class="badge" style="width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Cargando...</div>
+        <div id="userRoleBadge" class="badge role" style="margin-top: 0.35rem; width: 100%; text-align: center;">-</div>
+      </div>
+    </aside>
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      <!-- TAB 1: FORMULARIO DE SOLICITUD -->
+      <section id="tab-solicitud" class="tab-content active">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-title">
+              <h3>Registro de solicitud de rehabilitación</h3>
+            </div>
+          </div>
+          <form id="policyForm" onsubmit="handleFormSubmit(event)">
+            <div class="grid-2">
+              <div class="form-group">
+                <label for="identificacionCliente">Identificación del cliente <span class="req">*</span></label>
+                <input type="text" id="identificacionCliente" required placeholder="Número de documento" maxlength="15">
+                <span class="field-error" id="identificacionCliente-error"></span>
+              </div>
+              <div class="form-group">
+                <label for="nombreCliente">Nombre del cliente <span class="req">*</span></label>
+                <input type="text" id="nombreCliente" required placeholder="Nombre completo">
+              </div>
+              <div class="form-group">
+                <label for="poliza">Número de póliza <span class="req">*</span></label>
+                <input type="text" id="poliza" required placeholder="Ej: 123456789123" maxlength="13">
+                <span class="field-error" id="poliza-error"></span>
+                <span class="field-info" id="poliza-rehab-info"></span>
+              </div>
+             
+              <!-- SECCIÓN DINÁMICA DE CANAL -->
+              <div class="form-group">
+                <label for="canal">Canal <span class="req">*</span></label>
+                <div id="canalContainer">
+                  <select id="canal" required>
+                    <option value="" disabled selected>-- Seleccione un canal --</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="ramo">Ramo <span class="req">*</span></label>
+                <select id="ramo" required>
+                  <option value="" disabled selected>-- Seleccione un ramo --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="producto">Producto <span class="req">*</span></label>
+                <select id="producto" required>
+                  <option value="" disabled selected>-- Seleccione un producto --</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="fechaRecaudo">Fecha de recaudo <span class="req">*</span></label>
+                <input type="date" id="fechaRecaudo" required>
+                <span class="field-error" id="fechaRecaudo-error"></span>
+              </div>
+              <div class="form-group">
+                <label for="fechaAnulacion">Fecha de anulación <span class="req">*</span></label>
+                <input type="date" id="fechaAnulacion" required>
+                <span class="field-error" id="fechaAnulacion-error"></span>
+              </div>
+            </div>
+            <div class="form-group" style="margin-top: 0.75rem;">
+              <label for="inconsistencia">Inconsistencias <span class="req">*</span></label>
+              <textarea id="inconsistencia" rows="3" required placeholder="Ingrese el detalle de las inconsistencias..."></textarea>
+              <span class="field-error" id="inconsistencia-error"></span>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="btnSave" class="btn btn-primary">Guardar solicitud</button>
+            </div>
+          </form>
+        </div>
+      </section>
+      <!-- TAB 2: BANDEJA DE PENDIENTES -->
+      <section id="tab-bandeja" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-title">
+              <h3>Bandeja de pendientes por aprobar</h3>
+            </div>
+            <div class="header-actions">
+              <div class="search-input-wrapper">
+                <svg class="search-icon" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="filterBandejaGlobal" placeholder="Buscar por id del cliente o número de póliza..." oninput="filtrarBandeja()">
+              </div>
+              <button type="button" class="btn btn-refresh" onclick="recargarDatos(true)">
+                <svg class="icon-btn-svg" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Actualizar</span>
+              </button>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="styled-table" id="policiesTable">
+              <thead>
+                <tr>
+                  <th>Id del cliente</th>
+                  <th>Póliza</th>
+                  <th>Estado actual</th>
+                  <th style="width: 120px; text-align: center;">Información</th>
+                  <th style="width: 160px; text-align: center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" style="text-align: center; color: gray;">Cargando solicitudes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-container">
+            <div class="pagination-left">
+              <span>Registros por página:</span>
+              <select onchange="changePageSize('bandeja', this.value)">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+              <span id="bandejaRangeInfo" style="margin-left: 0.5rem;">Showing 0-0 of 0</span>
+            </div>
+            <div class="pagination-controls">
+              <button type="button" class="pagination-btn" id="btnPrevBandeja" onclick="changePage('bandeja', -1)" disabled>&lt;</button>
+              <span class="pagination-page-indicator" id="bandejaPageIndicator">Página 1 de 1</span>
+              <button type="button" class="pagination-btn" id="btnNextBandeja" onclick="changePage('bandeja', 1)" disabled>&gt;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- TAB 3: HISTORIAL -->
+      <section id="tab-historial" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-title">
+              <h3>Historial general de solicitudes</h3>
+            </div>
+            <button type="button" class="btn btn-refresh" onclick="recargarDatos(true)">
+              <svg class="icon-btn-svg" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Actualizar</span>
+            </button>
+          </div>
+          <!-- PANEL DE FILTROS PARA HISTORIAL -->
+          <div class="filter-panel">
+            <div class="filter-header">
+              <span class="filter-header-title">Filtros de búsqueda</span>
+            </div>
+            <div class="filter-grid">
+              <div class="form-group">
+                <label for="filterPoliza">Póliza</label>
+                <input type="text" id="filterPoliza" placeholder="Buscar por póliza..." oninput="filtrarHistorial()">
+              </div>
+              <div class="form-group">
+                <label for="filterIdReh">Id del cliente</label>
+                <input type="text" id="filterIdReh" placeholder="Buscar por Id del cliente..." oninput="filtrarHistorial()">
+              </div>
+              <div class="form-group">
+                <label for="filterEstado">Estado</label>
+                <select id="filterEstado" onchange="filtrarHistorial()">
+                  <option value="">Todos los estados</option>
+                  <option value="EN PROCESO">En proceso</option>
+                  <option value="REHABILITADA">Rehabilitada</option>
+                  <option value="RECHAZADA">Rechazada</option>
+                  <option value="TRAMITAR CON OPERACIONES">Tramitar con Operaciones</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="filterFechaDesde">Desde</label>
+                <input type="date" id="filterFechaDesde" onchange="filtrarHistorial()">
+              </div>
+              <div class="form-group">
+                <label for="filterFechaHasta">Hasta</label>
+                <input type="date" id="filterFechaHasta" onchange="filtrarHistorial()">
+              </div>
+              <div class="form-group">
+                <button type="button" class="btn-clear-filters" onclick="limpiarFiltrosHistorial()">Limpiar Filtros</button>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="styled-table" id="historyTable">
+              <thead>
+                <tr>
+                  <th>Id del cliente</th>
+                  <th>Póliza</th>
+                  <th>Fecha Solicitud</th>
+                  <th>Estado</th>
+                  <th style="width: 120px; text-align: center;">Información</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" style="text-align: center; color: gray;">Cargando historial...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-container">
+            <div class="pagination-left">
+              <span>Registros por página:</span>
+              <select onchange="changePageSize('historial', this.value)">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+              <span id="historialRangeInfo" style="margin-left: 0.5rem;">Showing 0-0 of 0</span>
+            </div>
+            <div class="pagination-controls">
+              <button type="button" class="pagination-btn" id="btnPrevHistorial" onclick="changePage('historial', -1)" disabled>&lt;</button>
+              <span class="pagination-page-indicator" id="historialPageIndicator">Página 1 de 1</span>
+              <button type="button" class="pagination-btn" id="btnNextHistorial" onclick="changePage('historial', 1)" disabled>&gt;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+  <!-- MODAL DE CONFIRMACIÓN -->
+  <div id="modalConfirm" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h4 id="modalTitle" style="margin-bottom: 0.5rem; color: var(--primary);">Confirmar Operación</h4>
+      <p id="modalMessage" style="font-size: 0.9rem; margin-bottom: 1.25rem; color: var(--text-muted);"></p>
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button type="button" id="btnModalCancel" class="btn" style="background: var(--surface-subtle); border: 1px solid var(--border);">Cancelar</button>
+        <button type="button" id="btnModalConfirm" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+  <!-- MODAL OVERLAY DE CARGA / LOADING GLOBAL -->
+  <div id="globalLoader" class="loader-overlay hidden">
+    <div class="loader-card">
+      <div class="spinner"></div>
+      <div id="loaderMessage" class="loader-text">Procesando...</div>
+    </div>
+  </div>
+  <?!= include('App'); ?>
+</body>
+</html>

@@ -1,0 +1,1173 @@
+<script>
+  /**
+   * ============================================================================
+   * SISTEMA DE GESTIÓN DE REHABILITACIÓN DE PÓLIZAS - CLIENTE (FRONTEND)
+   * Estado Reactivo, Menús Desplegables ESTRICTOS, Consulta de Pólizas en Tiempo Real.
+   * OPTIMIZADO: Inyección DOM mediante DocumentFragment y Reducción de Reflows.
+   * ============================================================================
+   */
+  let AppState = {
+    currentUser: null,
+    solicitudes: [],
+    solicitudesFiltered: [],
+    historial: [],
+    historialFiltered: [],
+    usuarios: [],          
+    usuariosFiltered: [],  
+    catalogos: {
+      ramos: [],
+      productos: [],
+      canales: [],
+      ramoProductoMap: {}
+    },
+    pagination: {
+      bandeja: { currentPage: 1, pageSize: 10 },
+      historial: { currentPage: 1, pageSize: 10 },
+      usuarios: { currentPage: 1, pageSize: 10 }
+    }
+  };
+  let debounceTimerPoliza = null;
+  document.addEventListener('DOMContentLoaded', () => {
+    cargarContextoInicial();
+    vincularEventosFormulario();
+    configurarValidacionesTiempoReal();
+  });
+  function showLoading(message = 'Procesando...') {
+    const loader = document.getElementById('globalLoader');
+    const msgElem = document.getElementById('loaderMessage');
+    if (msgElem) msgElem.textContent = message;
+    if (loader) loader.classList.remove('hidden');
+  }
+  function hideLoading() {
+    const loader = document.getElementById('globalLoader');
+    if (loader) loader.classList.add('hidden');
+  }
+  function vincularEventosFormulario() {
+    const ramoInput = document.getElementById('ramo');
+    if (ramoInput) {
+      ramoInput.addEventListener('change', handleRamoChange);
+    }
+    const userForm = document.getElementById('userForm');
+    if (userForm) {
+      userForm.addEventListener('submit', handleUserSubmit);
+    }
+    // Vincular eventos dinámicos a los filtros del historial
+    const fDesde = document.getElementById('filterFechaDesde');
+    const fHasta = document.getElementById('filterFechaHasta');
+    const fEstado = document.getElementById('filterEstado');
+    const fPoliza = document.getElementById('filterPoliza');
+    const fIdReh = document.getElementById('filterIdReh');
+    [fDesde, fHasta, fEstado].forEach(elem => {
+      if (elem) {
+        elem.addEventListener('change', filtrarHistorial);
+      }
+    });
+    [fPoliza, fIdReh].forEach(elem => {
+      if (elem) {
+        elem.addEventListener('input', filtrarHistorial);
+      }
+    });
+  }
+  function verificarRehabilitacionesTiempoReal(polizaValor) {
+    const infoSpan = document.getElementById('poliza-rehab-info');
+    if (!infoSpan) return;
+    if (!polizaValor || polizaValor.trim().length === 0) {
+      infoSpan.textContent = "";
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.success && res.count > 0) {
+          const textoVeces = res.count === 1 ? 'vez' : 'veces';
+          infoSpan.textContent = `El número de póliza se ha rehabilitado (${res.count}) ${textoVeces} en el último año.`;
+        } else {
+          infoSpan.textContent = "";
+        }
+      })
+      .withFailureHandler(err => console.error("Error al consultar rehabilitaciones en tiempo real:", err))
+      .consultarRehabilitacionesUltimoAno(polizaValor);
+  }
+  function validarPoliza(inputPoliza, errPoliza) {
+    if (!inputPoliza || !errPoliza) return false;
+    const valorOriginal = inputPoliza.value;
+    let mensajeError = "";
+    let valorLimpio = valorOriginal.replace(/\D/g, '');
+    if (valorOriginal.length > 13 || valorLimpio.length > 13) {
+      mensajeError = "No se permiten más de 13 dígitos";
+      valorLimpio = valorLimpio.substring(0, 13);
+    } else if (valorLimpio.length === 0 || valorLimpio.length < 13) {
+      mensajeError = "Número de póliza incompleto";
+    }
+    inputPoliza.value = valorLimpio;
+    if (mensajeError) {
+      errPoliza.textContent = mensajeError;
+      inputPoliza.classList.add('input-error');
+      return false;
+    } else {
+      errPoliza.textContent = "";
+      inputPoliza.classList.remove('input-error');
+      return true;
+    }
+  }
+  function validarInconsistencia() {
+    const inputObs = document.getElementById('inconsistencia');
+    const errObs = document.getElementById('inconsistencia-error');
+    if (!inputObs) return true;
+    const valor = inputObs.value.trim();
+    if (!valor) {
+      if (errObs) errObs.textContent = "El campo Inconsistencias es obligatorio.";
+      inputObs.classList.add('input-error');
+      return false;
+    } else {
+      if (errObs) errObs.textContent = "";
+      inputObs.classList.remove('input-error');
+      return true;
+    }
+  }
+  function validarFechas() {
+    const inputRecaudo = document.getElementById('fechaRecaudo');
+    const inputAnulacion = document.getElementById('fechaAnulacion');
+    const errRecaudo = document.getElementById('fechaRecaudo-error');
+    const errAnulacion = document.getElementById('fechaAnulacion-error');
+    if (!inputRecaudo || !inputAnulacion) return true;
+    const valRecaudo = inputRecaudo.value;
+    const valAnulacion = inputAnulacion.value;
+    let esValido = true;
+    let msgRecaudo = "";
+    let msgAnulacion = "";
+    if (valRecaudo && valAnulacion) {
+      const fechaRecaudo = new Date(valRecaudo);
+      const fechaAnulacion = new Date(valAnulacion);
+      if (fechaRecaudo > fechaAnulacion) {
+        msgRecaudo = "La fecha de recaudo no puede ser mayor a la de anulación";
+        msgAnulacion = "La fecha de anulación debe ser igual o posterior al recaudo";
+        esValido = false;
+      }
+    }
+    if (errRecaudo) {
+      errRecaudo.textContent = msgRecaudo;
+      if (msgRecaudo) inputRecaudo.classList.add('input-error');
+      else inputRecaudo.classList.remove('input-error');
+    }
+    if (errAnulacion) {
+      errAnulacion.textContent = msgAnulacion;
+      if (msgAnulacion) inputAnulacion.classList.add('input-error');
+      else inputAnulacion.classList.remove('input-error');
+    }
+    return esValido;
+  }
+  function configurarValidacionesTiempoReal() {
+    const inputPoliza = document.getElementById('poliza');
+    const errPoliza = document.getElementById('poliza-error');
+    const inputIdCliente = document.getElementById('identificacionCliente');
+    const errIdCliente = document.getElementById('identificacionCliente-error');
+    const infoSpan = document.getElementById('poliza-rehab-info');
+    const inputObs = document.getElementById('inconsistencia');
+    if (inputPoliza && errPoliza) {
+      inputPoliza.addEventListener('input', () => {
+        const esValida = validarPoliza(inputPoliza, errPoliza);
+        clearTimeout(debounceTimerPoliza);
+        if (esValida) {
+          debounceTimerPoliza = setTimeout(() => {
+            verificarRehabilitacionesTiempoReal(inputPoliza.value.trim());
+          }, 350);
+        } else if (infoSpan) {
+          infoSpan.textContent = "";
+        }
+      });
+      inputPoliza.addEventListener('blur', () => {
+        const esValida = validarPoliza(inputPoliza, errPoliza);
+        if (esValida) {
+          verificarRehabilitacionesTiempoReal(inputPoliza.value.trim());
+        }
+      });
+    }
+    if (inputIdCliente && errIdCliente) {
+      inputIdCliente.addEventListener('input', (e) => {
+        const valorOriginal = e.target.value;
+        let mensajeError = "";
+        if (/\D/.test(valorOriginal)) {
+          mensajeError = "Formato incorrecto: Solo se permiten caracteres numéricos.";
+        }
+        const valorLimpio = valorOriginal.replace(/\D/g, '');
+        e.target.value = valorLimpio;
+        if (mensajeError) {
+          errIdCliente.textContent = mensajeError;
+          inputIdCliente.classList.add('input-error');
+        } else {
+          errIdCliente.textContent = "";
+          inputIdCliente.classList.remove('input-error');
+        }
+      });
+    }
+    if (inputObs) {
+      inputObs.addEventListener('input', validarInconsistencia);
+      inputObs.addEventListener('blur', validarInconsistencia);
+    }
+    const inputRecaudo = document.getElementById('fechaRecaudo');
+    const inputAnulacion = document.getElementById('fechaAnulacion');
+    if (inputRecaudo) {
+      inputRecaudo.addEventListener('change', validarFechas);
+      inputRecaudo.addEventListener('input', validarFechas);
+    }
+    if (inputAnulacion) {
+      inputAnulacion.addEventListener('change', validarFechas);
+      inputAnulacion.addEventListener('input', validarFechas);
+    }
+  }
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'scale(0.85)';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+  function confirmDialog(title, message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('modalConfirm');
+      const titleElem = document.getElementById('modalTitle');
+      const msgElem = document.getElementById('modalMessage');
+      const btnConfirm = document.getElementById('btnModalConfirm');
+      const btnCancel = document.getElementById('btnModalCancel');
+      if (!modal) {
+        resolve(confirm(`${title}: ${message}`));
+        return;
+      }
+      titleElem.textContent = title;
+      msgElem.textContent = message;
+      modal.classList.remove('hidden');
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        btnConfirm.removeEventListener('click', onConfirm);
+        btnCancel.removeEventListener('click', onCancel);
+      };
+      const onConfirm = () => { cleanup(); resolve(true); };
+      const onCancel = () => { cleanup(); resolve(false); };
+      btnConfirm.addEventListener('click', onConfirm);
+      btnCancel.addEventListener('click', onCancel);
+    });
+  }
+  function cargarContextoInicial() {
+    showLoading('Cargando aplicación...');
+    // FASE 1: perfil de usuario + catálogos (rápido, usa caché)
+    // Muestra la UI en cuanto llegan, sin esperar los registros.
+    google.script.run
+      .withSuccessHandler(datos => {
+        if (!datos || !datos.success) {
+          if (datos && datos.unauthorized) {
+            renderError404View(datos.userEmail || '');
+          } else {
+            hideLoading();
+            showToast('Error al cargar: ' + (datos ? datos.error : 'Sin respuesta'), 'error');
+          }
+          return;
+        }
+        // Aplica usuario y catálogos al estado
+        AppState.currentUser = datos.currentUser;
+        AppState.catalogos.ramos = datos.ramos || [];
+        AppState.catalogos.productos = datos.productos || [];
+        AppState.catalogos.canales = datos.canales || [];
+        AppState.catalogos.ramoProductoMap = datos.ramoProductoMap || {};
+
+
+        // Actualiza la UI con lo que tenemos — sin esperar los registros
+        const userEmailElem = document.getElementById('userEmailBadge');
+        const userRoleElem = document.getElementById('userRoleBadge');
+        const tabUsuariosBtn = document.getElementById('tabBtnUsuarios');
+        if (userEmailElem && datos.currentUser) userEmailElem.textContent = datos.currentUser.email;
+        if (userRoleElem && datos.currentUser) userRoleElem.textContent = datos.currentUser.role;
+        if (tabUsuariosBtn && datos.currentUser && datos.currentUser.role === 'Aprobador') {
+          tabUsuariosBtn.style.display = 'flex';
+        }
+        configurarComponenteCanal(datos.currentUser);
+        poblarSelect('ramo', AppState.catalogos.ramos, '-- Seleccione un ramo --');
+        poblarSelect('producto', AppState.catalogos.productos, '-- Seleccione un producto --');
+
+
+        // FASE 2: registros + usuarios — el loading se mantiene hasta que terminen
+        google.script.run
+          .withSuccessHandler(registros => {
+            hideLoading();
+            if (!registros || !registros.success) return;
+
+
+            AppState.solicitudes = registros.solicitudes || [];
+            AppState.solicitudesFiltered = [...AppState.solicitudes];
+
+
+            const mapaGeneral = new Map();
+            (registros.solicitudes || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+            (registros.historial || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+            AppState.historial = Array.from(mapaGeneral.values()).sort((a, b) => (b.filaFisica || 0) - (a.filaFisica || 0));
+            AppState.historialFiltered = [...AppState.historial];
+
+
+            AppState.usuarios = registros.usuarios || [];
+            AppState.usuariosFiltered = [...AppState.usuarios];
+
+
+            renderBandeja();
+            renderHistorial();
+            renderUsuarios();
+          })
+          .withFailureHandler(err => {
+            hideLoading();
+            showToast('❌ Error al cargar registros: ' + err.message, 'error');
+          })
+          .getInitialContext();
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        renderError404View();
+      })
+      .getContextoUsuarioYCatalogos();
+  }
+  function renderError404View(userEmail = '') {
+    document.body.innerHTML = `
+      <div class="error-404-container">
+        <div class="error-404-card">
+          <div class="error-404-icon">
+            <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <div class="error-404-code">404</div>
+          <h1 class="error-404-title">Acceso No Autorizado</h1>
+          <p class="error-404-message">Lo sentimos, la cuenta con la que intentas ingresar no está registrada o se encuentra inactiva en el sistema de gestión.</p>
+          ${userEmail ? `<div class="error-404-user">${userEmail}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+  function inicializarUI(datos) {
+    if (!datos || !datos.success) {
+      if (datos && datos.unauthorized) {
+        renderError404View(datos.userEmail || "");
+      } else {
+        showToast("Error en el servidor: " + (datos ? datos.error : "Sin respuesta"), 'error');
+      }
+      return;
+    }
+    AppState.currentUser = datos.currentUser;
+    AppState.solicitudes = datos.solicitudes || [];
+    AppState.solicitudesFiltered = [...AppState.solicitudes];
+    // CONSOLIDACIÓN DEL HISTORIAL GENERAL (Pendientes + Procesados)
+    const mapaGeneral = new Map();
+    (datos.solicitudes || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+    (datos.historial || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+    AppState.historial = Array.from(mapaGeneral.values()).sort((a, b) => (b.filaFisica || 0) - (a.filaFisica || 0));
+    AppState.historialFiltered = [...AppState.historial];
+    AppState.usuarios = datos.usuarios || [];
+    AppState.usuariosFiltered = [...AppState.usuarios];
+    AppState.catalogos.ramos = datos.ramos || [];
+    AppState.catalogos.productos = datos.productos || [];
+    AppState.catalogos.canales = datos.canales || [];
+    AppState.catalogos.ramoProductoMap = datos.ramoProductoMap || {};
+   
+    const userEmailElem = document.getElementById('userEmailBadge');
+    const userRoleElem = document.getElementById('userRoleBadge');
+    const tabUsuariosBtn = document.getElementById('tabBtnUsuarios');
+    if (userEmailElem && datos.currentUser) userEmailElem.textContent = datos.currentUser.email;
+    if (userRoleElem && datos.currentUser) userRoleElem.textContent = datos.currentUser.role;
+    if (tabUsuariosBtn && datos.currentUser && datos.currentUser.role === 'Aprobador') {
+      tabUsuariosBtn.style.display = 'flex';
+    }
+    configurarComponenteCanal(datos.currentUser);
+    poblarSelect('ramo', AppState.catalogos.ramos, '-- Seleccione un ramo --');
+    poblarSelect('producto', AppState.catalogos.productos, '-- Seleccione un producto --');
+    renderBandeja();
+    renderHistorial();
+    renderUsuarios();
+  }
+  function configurarComponenteCanal(currentUser) {
+    const container = document.getElementById('canalContainer');
+    if (!container) return;
+    const canalEstablecido = currentUser && currentUser.canal ? String(currentUser.canal).trim() : '';
+    if (canalEstablecido !== '') {
+      container.innerHTML = `
+        <select id="canal" required>
+          <option value="${canalEstablecido}" selected>${canalEstablecido}</option>
+        </select>
+      `;
+    } else {
+      container.innerHTML = `
+        <select id="canal" disabled style="background-color: var(--surface-subtle); cursor: not-allowed;">
+          <option value="" selected>-- Sin canal asignado (Bloqueado) --</option>
+        </select>
+      `;
+    }
+  }
+  function poblarSelect(elementId, items, placeholderText = '-- Seleccione una opción --') {
+    const selectElem = document.getElementById(elementId);
+    if (!selectElem) return;
+    selectElem.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = placeholderText;
+    defaultOption.disabled = true;
+    defaultOption.selected = true;
+    fragment.appendChild(defaultOption);
+
+
+    (items || []).forEach(item => {
+      if (item !== null && item !== undefined && String(item).trim() !== '') {
+        const option = document.createElement('option');
+        option.value = String(item).trim();
+        option.textContent = String(item).trim();
+        fragment.appendChild(option);
+      }
+    });
+    selectElem.appendChild(fragment);
+  }
+  function handleRamoChange() {
+    const ramoSelect = document.getElementById('ramo');
+    const productoSelect = document.getElementById('producto');
+    if (!ramoSelect || !productoSelect) return;
+    const ramoValor = ramoSelect.value.trim();
+    if (!ramoValor) {
+      poblarSelect('producto', AppState.catalogos.productos, '-- Seleccione un producto --');
+      return;
+    }
+    const productosAsociados = AppState.catalogos.ramoProductoMap[ramoValor];
+    if (productosAsociados && productosAsociados.length > 0) {
+      poblarSelect('producto', productosAsociados, '-- Seleccione un producto --');
+      if (productosAsociados.length === 1) {
+        productoSelect.value = productosAsociados[0];
+      }
+    } else {
+      poblarSelect('producto', AppState.catalogos.productos, '-- Seleccione un producto --');
+    }
+  }
+  function switchTab(tabId, event) {
+    const tabs = document.querySelectorAll('.tab-content');
+    tabs.forEach(t => t.classList.remove('active'));
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(b => b.classList.remove('active'));
+    const targetTab = document.getElementById(tabId);
+    if (targetTab) targetTab.classList.add('active');
+    if (event && event.currentTarget) {
+      event.currentTarget.classList.add('active');
+    }
+  }
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    const inputPoliza = document.getElementById('poliza');
+    const errPoliza = document.getElementById('poliza-error');
+    const infoSpan = document.getElementById('poliza-rehab-info');
+   
+    const esPolizaValida = validarPoliza(inputPoliza, errPoliza);
+    const sonFechasValidas = validarFechas();
+    const esObsValida = validarInconsistencia();
+    if (!esPolizaValida || !sonFechasValidas || !esObsValida) {
+      if (!esPolizaValida && inputPoliza) {
+        inputPoliza.focus();
+      } else if (!sonFechasValidas) {
+        document.getElementById('fechaRecaudo')?.focus();
+      } else if (!esObsValida) {
+        document.getElementById('inconsistencia')?.focus();
+      }
+      return;
+    }
+    const btn = document.getElementById('btnSave');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+    }
+    showLoading('Guardando solicitud...');
+    const canalElem = document.getElementById('canal');
+    const datos = {
+      ramo: document.getElementById('ramo').value.trim(),
+      producto: document.getElementById('producto').value.trim(),
+      poliza: inputPoliza.value.trim(),
+      canal: canalElem ? canalElem.value.trim() : '',
+      fechaRecaudo: document.getElementById('fechaRecaudo').value,
+      fechaAnulacion: document.getElementById('fechaAnulacion').value,
+      nombreCliente: document.getElementById('nombreCliente').value.trim(),
+      identificacionCliente: document.getElementById('identificacionCliente').value.trim(),
+      inconsistencia: document.getElementById('inconsistencia').value.trim()
+    };
+    google.script.run
+      .withSuccessHandler(res => {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar solicitud';
+        }
+        if (res && res.success) {
+          const form = document.getElementById('policyForm');
+          if (form) form.reset();
+          if (errPoliza) errPoliza.textContent = "";
+          if (infoSpan) infoSpan.textContent = "";
+          if (inputPoliza) inputPoliza.classList.remove('input-error');
+          validarFechas();
+          poblarSelect('producto', AppState.catalogos.productos, '-- Seleccione un producto --');
+          // Actualiza bandeja manteniendo el loading activo — recargarDatos lo cierra al terminar
+          recargarDatos(false, false);
+          switchTab('tab-bandeja');
+        } else {
+          hideLoading();
+          showToast("❌ Error: " + (res ? res.message : "Error desconocido al procesar."), 'error');
+        }
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar solicitud';
+        }
+        showToast("❌ Error del servidor: " + err.message, 'error');
+      })
+      .guardarSolicitud(datos);
+  }
+  function handleUserSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveUser');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Registrando...';
+    }
+    showLoading('Registrando usuario...');
+    const userData = {
+      name: document.getElementById('userName').value.trim(),
+      documentId: document.getElementById('userDocument').value.trim(),
+      email: document.getElementById('userEmail').value.trim(),
+      role: document.getElementById('userRole').value,
+      status: 'Activo'
+    };
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoading();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Registrar Usuario';
+        }
+        if (res && res.success) {
+          showToast(`Usuario registrado con éxito (${res.user.id})`, 'success');
+          const form = document.getElementById('userForm');
+          if (form) form.reset();
+          // Agrega el nuevo usuario directamente al estado sin hacer otro viaje al servidor
+          if (res.user) {
+            AppState.usuarios = [...AppState.usuarios, res.user];
+            AppState.usuariosFiltered = [...AppState.usuarios];
+            renderUsuarios();
+          }
+        } else {
+          showToast("❌ Error: " + (res ? res.message : "No se pudo crear el usuario."), 'error');
+        }
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Registrar Usuario';
+        }
+        showToast("❌ Error del servidor: " + err.message, 'error');
+      })
+      .createUser(userData);
+  }
+  function renderUsuarios() {
+    const tbody = document.querySelector('#usersTable tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const data = AppState.usuariosFiltered || [];
+    const total = data.length;
+    const { currentPage, pageSize } = AppState.pagination.usuarios;
+    if (total === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:gray;">No se encontraron usuarios registrados</td></tr>';
+      updatePaginationControls('usuarios', 0, 0, 0, 1, 1);
+      return;
+    }
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const paginatedData = data.slice(start, end);
+    const totalPages = Math.ceil(total / pageSize) || 1;
+
+
+    const fragment = document.createDocumentFragment();
+
+
+    paginatedData.forEach(usr => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${usr.id || '-'}</strong></td>
+        <td>${usr.name || '-'}</td>
+        <td>${usr.documentId || '-'}</td>
+        <td>${usr.email || '-'}</td>
+        <td><span class="badge-role">${usr.role || 'Usuario'}</span></td>
+        <td><span class="badge-status ${usr.status === 'ACTIVO' || usr.status === 'Activo' ? 'status-aprobado' : 'status-rechazado'}">${usr.status || 'Activo'}</span></td>
+      `;
+      fragment.appendChild(tr);
+    });
+
+
+    tbody.appendChild(fragment);
+    updatePaginationControls('usuarios', start + 1, end, total, currentPage, totalPages);
+  }
+  function renderBandeja() {
+    const thead = document.querySelector('#policiesTable thead');
+    const tbody = document.querySelector('#policiesTable tbody');
+    if (!tbody) return;
+   
+    const esAdminOAprobador = (AppState.currentUser && (AppState.currentUser.role === 'Aprobador'));
+    const totalCols = esAdminOAprobador ? 5 : 4;
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>Id del cliente</th>
+          <th>Póliza</th>
+          <th>Estado actual</th>
+          <th style="width: 120px; text-align: center;">Información</th>
+          ${esAdminOAprobador ? '<th style="width: 160px; text-align: center;">Acciones</th>' : ''}
+        </tr>
+      `;
+    }
+    tbody.innerHTML = '';
+    const data = AppState.solicitudesFiltered || [];
+    const total = data.length;
+    const { currentPage, pageSize } = AppState.pagination.bandeja;
+   
+    if (total === 0) {
+      tbody.innerHTML = `<tr><td colspan="${totalCols}" style="text-align:center; color:gray;">No hay solicitudes pendientes en la bandeja</td></tr>`;
+      updatePaginationControls('bandeja', 0, 0, 0, 1, 1);
+      return;
+    }
+   
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const paginatedData = data.slice(start, end);
+    const totalPages = Math.ceil(total / pageSize) || 1;
+
+
+    const fragment = document.createDocumentFragment();
+
+
+    paginatedData.forEach(sol => {
+      const tr = document.createElement('tr');
+      tr.id = `fila-bandeja-${sol.filaFisica}`;
+     
+      let htmlFila = `
+        <td style="font-size: 0.85rem; color: var(--text-main);"><strong>${sol.identificacionCliente || '-'}</strong></td>
+        <td><strong>${sol.poliza || '-'}</strong></td>
+        <td><span class="badge-status status-pendiente">${sol.estadoRehab || 'EN PROCESO'}</span></td>
+        <td style="text-align: center;">
+          <button type="button" class="btn-accion-detalles" onclick="toggleDetalles(${sol.filaFisica})">Detalles</button>
+        </td>
+      `;
+      if (esAdminOAprobador) {
+        htmlFila += `
+          <td style="text-align: center;">
+            <div class="acciones-container">
+              <button type="button" class="btn-accion-gestionar" onclick="toggleGestion(${sol.filaFisica})">Gestionar</button>
+            </div>
+          </td>
+        `;
+      }
+      tr.innerHTML = htmlFila;
+      fragment.appendChild(tr);
+
+
+      // PANEL DE DETALLES BANDEJA
+      const trDetalles = document.createElement('tr');
+      trDetalles.id = `detalles-bandeja-${sol.filaFisica}`;
+      trDetalles.className = 'row-detalles hidden';
+      const tdDetalles = document.createElement('td');
+      tdDetalles.colSpan = totalCols;
+      const panelDiv = document.createElement('div');
+      panelDiv.className = 'panel-detalles-inconsistencia';
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'panel-detalles-header';
+      const tituloSpan = document.createElement('span');
+      tituloSpan.className = 'panel-detalles-titulo';
+      tituloSpan.innerHTML = `<svg class="icon-svg" style="width:14px; height:14px;" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Detalle Completo de la Solicitud`;
+      const btnCerrar = document.createElement('button');
+      btnCerrar.type = 'button';
+      btnCerrar.className = 'panel-detalles-cerrar';
+      btnCerrar.innerHTML = '&times;';
+      btnCerrar.title = 'Cerrar detalles';
+      btnCerrar.onclick = () => toggleDetalles(sol.filaFisica);
+      headerDiv.appendChild(tituloSpan);
+      headerDiv.appendChild(btnCerrar);
+      const detailsGrid = document.createElement('div');
+      detailsGrid.className = 'details-grid';
+      detailsGrid.innerHTML = `
+        <div class="detail-item">
+          <span class="detail-label">Identificación Cliente</span>
+          <span class="detail-value">${sol.identificacionCliente || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Nombre del Cliente</span>
+          <span class="detail-value">${sol.nombreCliente || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Solicitado Por (Funcionario)</span>
+          <span class="detail-value">${sol.solicitadoPor || sol.usuario || sol.funcionario || sol.emailSolicitante || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Solicitud</span>
+          <span class="detail-value">${formatearFechaUI(sol.fechaSolicitud)}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Ramo</span>
+          <span class="detail-value">${sol.ramo || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Producto</span>
+          <span class="detail-value">${sol.producto || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Recaudo</span>
+          <span class="detail-value">${sol.fechaRecaudo || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Anulación</span>
+          <span class="detail-value">${sol.fechaAnulacion || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Canal</span>
+          <span class="detail-value">${sol.canal || '-'}</span>
+        </div>
+      `;
+     
+      const incContainer = document.createElement('div');
+      incContainer.className = 'panel-detalles-observaciones';
+      const incLabel = document.createElement('div');
+      incLabel.className = 'detail-label';
+      incLabel.style.marginBottom = '0.25rem';
+      incLabel.textContent = 'Inconsistencias';
+      const incContenido = document.createElement('div');
+      incContenido.className = 'panel-detalles-contenido';
+      incContenido.textContent = sol.inconsistencia || 'Sin inconsistencias registradas';
+      incContainer.appendChild(incLabel);
+      incContainer.appendChild(incContenido);
+      panelDiv.appendChild(headerDiv);
+      panelDiv.appendChild(detailsGrid);
+      panelDiv.appendChild(incContainer);
+      tdDetalles.appendChild(panelDiv);
+      trDetalles.appendChild(tdDetalles);
+      fragment.appendChild(trDetalles);
+
+
+      // PANEL DE GESTIÓN (FORMULARIO DESPLEGABLE)
+      if (esAdminOAprobador) {
+        const trGestion = document.createElement('tr');
+        trGestion.id = `gestion-bandeja-${sol.filaFisica}`;
+        trGestion.className = 'row-gestion hidden';
+        const tdGestion = document.createElement('td');
+        tdGestion.colSpan = totalCols;
+        const containerGestion = document.createElement('div');
+        containerGestion.className = 'panel-gestion-container';
+        const headerGestion = document.createElement('div');
+        headerGestion.className = 'panel-gestion-header';
+       
+        const tituloGestion = document.createElement('span');
+        tituloGestion.className = 'panel-gestion-titulo';
+        tituloGestion.innerHTML = `<svg class="icon-svg" style="width:14px; height:14px;" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg> Ventana de Gestión de Póliza (${sol.poliza})`;
+        const btnCerrarGestion = document.createElement('button');
+        btnCerrarGestion.type = 'button';
+        btnCerrarGestion.className = 'panel-detalles-cerrar';
+        btnCerrarGestion.innerHTML = '&times;';
+        btnCerrarGestion.title = 'Cerrar ventana';
+        btnCerrarGestion.onclick = () => toggleGestion(sol.filaFisica);
+        headerGestion.appendChild(tituloGestion);
+        headerGestion.appendChild(btnCerrarGestion);
+        const obsGestionDiv = document.createElement('div');
+        obsGestionDiv.className = 'panel-gestion-observaciones';
+        obsGestionDiv.innerHTML = `
+          <div class="form-group">
+            <label for="obsAprobador-${sol.filaFisica}">Observaciones:</label>
+            <textarea id="obsAprobador-${sol.filaFisica}" rows="2" placeholder="Ingrese las observaciones aquí..."></textarea>
+          </div>
+        `;
+        const actionsGestionDiv = document.createElement('div');
+        actionsGestionDiv.className = 'panel-gestion-actions';
+        actionsGestionDiv.innerHTML = `
+          <button type="button" class="btn-accion-aprobar" onclick="gestionarSolicitud(${sol.filaFisica}, 'APROBADO', '${sol.poliza}', event)">Rehabilitar</button>
+          <button type="button" class="btn-accion-rechazar" onclick="gestionarSolicitud(${sol.filaFisica}, 'RECHAZADO', '${sol.poliza}', event)">Rechazar</button>
+          <button type="button" class="btn-accion-tramitar" onclick="gestionarSolicitud(${sol.filaFisica}, 'TRAMITAR_OPERACIONES', '${sol.poliza}', event)">Tramitar con operaciones</button>
+        `;
+        containerGestion.appendChild(headerGestion);
+        containerGestion.appendChild(obsGestionDiv);
+        containerGestion.appendChild(actionsGestionDiv);
+        tdGestion.appendChild(containerGestion);
+        trGestion.appendChild(tdGestion);
+        fragment.appendChild(trGestion);
+      }
+    });
+
+
+    tbody.appendChild(fragment);
+    updatePaginationControls('bandeja', start + 1, end, total, currentPage, totalPages);
+  }
+  function filtrarBandeja() {
+    const inputSearch = document.getElementById('filterBandejaGlobal');
+    const query = inputSearch ? inputSearch.value.trim().toLowerCase() : '';
+    if (!query) {
+      AppState.solicitudesFiltered = [...AppState.solicitudes];
+    } else {
+      AppState.solicitudesFiltered = AppState.solicitudes.filter(sol => {
+        const idStr = String(sol.id || '').toLowerCase();
+        const idClienteStr = String(sol.identificacionCliente || '').toLowerCase();
+        const polizaStr = String(sol.poliza || '').toLowerCase();
+        const fechaSolRaw = String(sol.fechaSolicitud || '');
+        const fechaSolFormatted = formatearFechaUI(sol.fechaSolicitud).toLowerCase();
+        return idStr.includes(query) ||
+               idClienteStr.includes(query) ||
+               polizaStr.includes(query) ||
+               fechaSolRaw.toLowerCase().includes(query) ||
+               fechaSolFormatted.includes(query);
+      });
+    }
+    AppState.pagination.bandeja.currentPage = 1;
+    renderBandeja();
+  }
+  function toggleDetalles(filaFisica) {
+    const rowDetalles = document.getElementById(`detalles-bandeja-${filaFisica}`);
+    if (rowDetalles) {
+      rowDetalles.classList.toggle('hidden');
+    }
+  }
+  function toggleDetallesHistorial(filaFisica) {
+    const rowDetalles = document.getElementById(`detalles-historial-${filaFisica}`);
+    if (rowDetalles) {
+      rowDetalles.classList.toggle('hidden');
+    }
+  }
+  function toggleGestion(filaFisica) {
+    const rowGestion = document.getElementById(`gestion-bandeja-${filaFisica}`);
+    if (rowGestion) {
+      rowGestion.classList.toggle('hidden');
+    }
+  }
+  function renderHistorial() {
+    const tbody = document.querySelector('#historyTable tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const data = AppState.historialFiltered || [];
+    const total = data.length;
+    const { currentPage, pageSize } = AppState.pagination.historial;
+    if (total === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:gray;">No se encontraron registros en el historial</td></tr>';
+      updatePaginationControls('historial', 0, 0, 0, 1, 1);
+      return;
+    }
+    const start = (currentPage - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const paginatedData = data.slice(start, end);
+    const totalPages = Math.ceil(total / pageSize) || 1;
+
+
+    const fragment = document.createDocumentFragment();
+
+
+    paginatedData.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.id = `fila-historial-${item.filaFisica}`;
+      const estadoStr = String(item.estadoRehab || 'EN PROCESO').toUpperCase();
+      let claseBadge = 'status-pendiente';
+      if (estadoStr.includes('REHABILITAD') || estadoStr.includes('APROBADO')) {
+        claseBadge = 'status-aprobado';
+      } else if (estadoStr.includes('RECHAZAD')) {
+        claseBadge = 'status-rechazado';
+      } else if (estadoStr.includes('TRAMITAR')) {
+        claseBadge = 'status-tramitar';
+      }
+      tr.innerHTML = `
+        <td style="font-size: 0.85rem; color: var(--text-main);"><strong>${item.identificacionCliente || '-'}</strong></td>
+        <td><strong>${item.poliza || '-'}</strong></td>
+        <td style="font-size: 0.85rem;">${formatearFechaUI(item.fechaSolicitud)}</td>
+        <td><span class="badge-status ${claseBadge}">${item.estadoRehab || 'EN PROCESO'}</span></td>
+        <td style="text-align: center;">
+          <button type="button" class="btn-accion-detalles" onclick="toggleDetallesHistorial(${item.filaFisica})">Detalles</button>
+        </td>
+      `;
+      fragment.appendChild(tr);
+
+
+      // PANEL DE DETALLES DESPLEGABLE EN HISTORIAL
+      const trDetalles = document.createElement('tr');
+      trDetalles.id = `detalles-historial-${item.filaFisica}`;
+      trDetalles.className = 'row-detalles hidden';
+      const tdDetalles = document.createElement('td');
+      tdDetalles.colSpan = 6;
+      const panelDiv = document.createElement('div');
+      panelDiv.className = 'panel-detalles-inconsistencia';
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'panel-detalles-header';
+      const tituloSpan = document.createElement('span');
+      tituloSpan.className = 'panel-detalles-titulo';
+      tituloSpan.innerHTML = `<svg class="icon-svg" style="width:14px; height:14px;" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Información y Gestión Completa de la Solicitud`;
+      const btnCerrar = document.createElement('button');
+      btnCerrar.type = 'button';
+      btnCerrar.className = 'panel-detalles-cerrar';
+      btnCerrar.innerHTML = '&times;';
+      btnCerrar.title = 'Cerrar detalles';
+      btnCerrar.onclick = () => toggleDetallesHistorial(item.filaFisica);
+      headerDiv.appendChild(tituloSpan);
+      headerDiv.appendChild(btnCerrar);
+      const detailsGrid = document.createElement('div');
+      detailsGrid.className = 'details-grid';
+      detailsGrid.innerHTML = `
+        <div class="detail-item">
+          <span class="detail-label">Identificación Cliente</span>
+          <span class="detail-value">${item.identificacionCliente || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Nombre del Cliente</span>
+          <span class="detail-value">${item.nombreCliente || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Solicitado Por (Funcionario)</span>
+          <span class="detail-value">${item.solicitadoPor || item.usuario || item.funcionario || item.emailSolicitante || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Solicitud</span>
+          <span class="detail-value">${formatearFechaUI(item.fechaSolicitud)}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Ramo</span>
+          <span class="detail-value">${item.ramo || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Producto</span>
+          <span class="detail-value">${item.producto || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Recaudo</span>
+          <span class="detail-value">${item.fechaRecaudo || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Anulación</span>
+          <span class="detail-value">${item.fechaAnulacion || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Canal</span>
+          <span class="detail-value">${item.canal || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Estado Actual</span>
+          <span class="detail-value"><strong>${item.estadoRehab || 'EN PROCESO'}</strong></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Procesado Por</span>
+          <span class="detail-value">${item.procesadoPor || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fecha Proceso</span>
+          <span class="detail-value">${formatearFechaUI(item.fechaProceso)}</span>
+        </div>
+      `;
+      const incContainer = document.createElement('div');
+      incContainer.className = 'panel-detalles-observaciones';
+     
+      const incLabel = document.createElement('div');
+      incLabel.className = 'detail-label';
+      incLabel.style.marginBottom = '0.25rem';
+      incLabel.textContent = 'Inconsistencias (Detalle Solicitud)';
+     
+      const incContenido = document.createElement('div');
+      incContenido.className = 'panel-detalles-contenido';
+      incContenido.textContent = item.inconsistencia || 'Sin inconsistencias registradas';
+     
+      incContainer.appendChild(incLabel);
+      incContainer.appendChild(incContenido);
+      if (item.observacionesAprobador || item.observaciones) {
+        const obsGestionContainer = document.createElement('div');
+        obsGestionContainer.className = 'panel-detalles-observaciones';
+        obsGestionContainer.style.marginTop = '0.5rem';
+        const obsLabel = document.createElement('div');
+        obsLabel.className = 'detail-label';
+        obsLabel.style.marginBottom = '0.25rem';
+        obsLabel.textContent = 'Observaciones de Gestión (Aprobador)';
+        const obsContenido = document.createElement('div');
+        obsContenido.className = 'panel-detalles-contenido';
+        obsContenido.style.backgroundColor = 'var(--surface-subtle)';
+        obsContenido.textContent = item.observacionesAprobador || item.observaciones || '-';
+        obsGestionContainer.appendChild(obsLabel);
+        obsGestionContainer.appendChild(obsContenido);
+        incContainer.appendChild(obsGestionContainer);
+      }
+      panelDiv.appendChild(headerDiv);
+      panelDiv.appendChild(detailsGrid);
+      panelDiv.appendChild(incContainer);
+      tdDetalles.appendChild(panelDiv);
+      trDetalles.appendChild(tdDetalles);
+      fragment.appendChild(trDetalles);
+    });
+
+
+    tbody.appendChild(fragment);
+    updatePaginationControls('historial', start + 1, end, total, currentPage, totalPages);
+  }
+  function filtrarHistorial() {
+    const fDesdeVal = document.getElementById('filterFechaDesde') ? document.getElementById('filterFechaDesde').value : '';
+    const fHastaVal = document.getElementById('filterFechaHasta') ? document.getElementById('filterFechaHasta').value : '';
+    const fEstado = document.getElementById('filterEstado') ? document.getElementById('filterEstado').value.toUpperCase().trim() : '';
+    const fPoliza = document.getElementById('filterPoliza') ? document.getElementById('filterPoliza').value.trim().toLowerCase() : '';
+    const fIdReh = document.getElementById('filterIdReh') ? document.getElementById('filterIdReh').value.trim().toLowerCase() : '';
+    const fechaDesdeObj = fDesdeVal ? new Date(fDesdeVal + 'T00:00:00') : null;
+    const fechaHastaObj = fHastaVal ? new Date(fHastaVal + 'T23:59:59.999') : null;
+    AppState.historialFiltered = AppState.historial.filter(item => {
+      if (fPoliza && !String(item.poliza || '').toLowerCase().includes(fPoliza)) {
+        return false;
+      }
+      if (fIdReh && !String(item.identificacionCliente || '').toLowerCase().includes(fIdReh)) {
+        return false;
+      }
+      if (fEstado && !String(item.estadoRehab || '').toUpperCase().includes(fEstado)) {
+        return false;
+      }
+      if (fechaDesdeObj || fechaHastaObj) {
+        const fechaObj = normalizarFecha(item.fechaSolicitud || item.fechaProceso);
+        if (!fechaObj) return false;
+        if (fechaDesdeObj && fechaObj < fechaDesdeObj) return false;
+        if (fechaHastaObj && fechaObj > fechaHastaObj) return false;
+      }
+      return true;
+    });
+    AppState.pagination.historial.currentPage = 1;
+    renderHistorial();
+  }
+  function limpiarFiltrosHistorial() {
+    if (document.getElementById('filterFechaDesde')) document.getElementById('filterFechaDesde').value = '';
+    if (document.getElementById('filterFechaHasta')) document.getElementById('filterFechaHasta').value = '';
+    if (document.getElementById('filterEstado')) document.getElementById('filterEstado').value = '';
+    if (document.getElementById('filterPoliza')) document.getElementById('filterPoliza').value = '';
+    if (document.getElementById('filterIdReh')) document.getElementById('filterIdReh').value = '';
+    AppState.historialFiltered = [...AppState.historial];
+    AppState.pagination.historial.currentPage = 1;
+    renderHistorial();
+  }
+  function changePage(type, delta) {
+    const p = AppState.pagination[type];
+    let data;
+    if (type === 'bandeja') data = AppState.solicitudesFiltered;
+    else if (type === 'historial') data = AppState.historialFiltered;
+    else if (type === 'usuarios') data = AppState.usuariosFiltered;
+    const totalPages = Math.ceil((data ? data.length : 0) / p.pageSize) || 1;
+    const newPage = p.currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+      p.currentPage = newPage;
+      if (type === 'bandeja') renderBandeja();
+      else if (type === 'historial') renderHistorial();
+      else if (type === 'usuarios') renderUsuarios();
+    }
+  }
+  function changePageSize(type, size) {
+    AppState.pagination[type].pageSize = parseInt(size, 10);
+    AppState.pagination[type].currentPage = 1;
+    if (type === 'bandeja') renderBandeja();
+    else if (type === 'historial') renderHistorial();
+    else if (type === 'usuarios') renderUsuarios();
+  }
+  function updatePaginationControls(type, start, end, total, page, totalPages) {
+    const prefix = type;
+    const rangeElem = document.getElementById(`${prefix}RangeInfo`);
+    const pageElem = document.getElementById(`${prefix}PageIndicator`);
+    const btnPrev = document.getElementById(`btnPrev${prefix.charAt(0).toUpperCase() + prefix.slice(1)}`);
+    const btnNext = document.getElementById(`btnNext${prefix.charAt(0).toUpperCase() + prefix.slice(1)}`);
+    if (rangeElem) rangeElem.innerText = `Mostrando ${start}-${end} de ${total}`;
+    if (pageElem) pageElem.innerText = `Página ${page} de ${totalPages}`;
+    if (btnPrev) btnPrev.disabled = (page <= 1);
+    if (btnNext) btnNext.disabled = (page >= totalPages);
+  }
+  async function gestionarSolicitud(filaFisica, accion, poliza, event) {
+    if (event) event.preventDefault();
+    let textoAccion = accion;
+    if (accion === 'TRAMITAR_OPERACIONES') textoAccion = 'TRAMITAR CON OPERACIONES';
+   
+    const obsElem = document.getElementById(`obsAprobador-${filaFisica}`);
+    const observacionesTexto = obsElem ? obsElem.value.trim() : '';
+    const ok = await confirmDialog("Confirmar Operación", `¿Está seguro de marcar la póliza ${poliza} como ${textoAccion}?`);
+    if (!ok) return;
+    showLoading(`Procesando solicitud ${poliza}...`);
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoading();
+        if (res && res.success) {
+          // Usa directamente los datos que el servidor ya calculó — evita un segundo viaje
+          if (res.solicitudes !== undefined && res.historial !== undefined) {
+            aplicarDatosBandejaEHistorial(res.solicitudes, res.historial);
+          } else {
+            recargarDatos(false);
+          }
+        } else {
+          showToast("❌ " + (res ? res.error : "Error al procesar"), 'error');
+        }
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        showToast("❌ Error del servidor: " + err.message, 'error');
+      })
+      .procesarAprobacion(filaFisica, accion, poliza, observacionesTexto);
+  }
+  /**
+   * Aplica datos de solicitudes e historial al estado local y re-renderiza.
+   * Reutilizado tanto por recargarDatos como por la respuesta inline de gestionarSolicitud.
+   */
+  function aplicarDatosBandejaEHistorial(solicitudes, historial) {
+    AppState.solicitudes = solicitudes || [];
+    AppState.solicitudesFiltered = [...AppState.solicitudes];
+    const mapaGeneral = new Map();
+    (solicitudes || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+    (historial || []).forEach(item => mapaGeneral.set(item.filaFisica || item.id, item));
+    AppState.historial = Array.from(mapaGeneral.values()).sort((a, b) => (b.filaFisica || 0) - (a.filaFisica || 0));
+    AppState.historialFiltered = [...AppState.historial];
+    filtrarBandeja();
+    renderHistorial();
+  }
+  /**
+   * Refresca bandeja e historial usando el endpoint ligero (solo hoja de rehab).
+   * No recarga catálogos ni perfil de usuario, que ya están en memoria.
+   */
+  function recargarDatos(mostrarToastNotificacion = false, mostrarLoading = true) {
+    if (mostrarLoading) showLoading('Sincronizando datos...');
+    google.script.run
+      .withSuccessHandler(datos => {
+        hideLoading();
+        if (datos && datos.success) {
+          aplicarDatosBandejaEHistorial(datos.solicitudes, datos.historial);
+          if (mostrarToastNotificacion) {
+            showToast("Bandeja y datos actualizados correctamente", 'success');
+          }
+        } else if (datos && !datos.success && datos.unauthorized) {
+          renderError404View(datos.userEmail || "");
+        }
+      })
+      .withFailureHandler(err => {
+        hideLoading();
+        showToast("❌ Error al actualizar datos: " + err.message, 'error');
+      })
+      .getSolicitudesYHistorial();
+  }
+  function normalizarFecha(fechaVal) {
+    if (!fechaVal || fechaVal === '-') return null;
+    if (fechaVal instanceof Date) return isNaN(fechaVal.getTime()) ? null : fechaVal;
+    const str = String(fechaVal).trim();
+    if (str.includes('/')) {
+      const partesEspacio = str.split(' ');
+      const partesFecha = partesEspacio[0].split('/');
+      if (partesFecha.length === 3) {
+        const dia = parseInt(partesFecha[0], 10);
+        const mes = parseInt(partesFecha[1], 10) - 1;
+        const anio = parseInt(partesFecha[2], 10);
+        return new Date(anio, mes, dia);
+      }
+    }
+    const dIso = new Date(str);
+    return isNaN(dIso.getTime()) ? null : dIso;
+  }
+  function formatearFechaUI(fechaVal) {
+    const fechaObj = normalizarFecha(fechaVal);
+    if (!fechaObj) return fechaVal ? String(fechaVal) : '-';
+    const dia = String(fechaObj.getDate()).padStart(2, '0');
+    const mes = String(fechaObj.getMonth() + 1).padStart(2, '0');
+    const anio = fechaObj.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  }
+</script>
+
+
