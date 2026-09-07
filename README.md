@@ -1,4 +1,4 @@
-🛡️ Sistema de Gestión y Aprobación de Rehabilitación de Pólizas
+#🛡️ Sistema de Gestión y Aprobación de Rehabilitación de Pólizas
 [![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/apps-script)
 [![AppSheet](https://img.shields.io/badge/AppSheet-1A73E8?style=for-the-badge&logo=google&logoColor=white)](https://about.appsheet.com/)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=for-the-badge&logo=googleworkspace&logoColor=white)](https://sheets.google.com)
@@ -7,8 +7,8 @@
 Sistema web centralizado, reactivo e interactivo para la radicación, validación y gestión administrativa de solicitudes de rehabilitación de pólizas.
 La solución conecta una interfaz web ligera con Google Sheets / AppSheet, proporcionando trazabilidad, auditoría y control de acceso basado en roles (RBAC).
 
-🚀 Flujo de Trabajo y Funcionalidades
-📝 1. Captura y Validación en Tiempo Real
+#🚀 Flujo de Trabajo y Funcionalidades
+#📝 1. Captura y Validación en Tiempo Real
 
 El usuario Solicitante radica solicitudes ingresando información como:
 
@@ -22,7 +22,7 @@ Inconsistencia
 
 La aplicación realiza validaciones en segundo plano para consultar rehabilitaciones anteriores del cliente durante los últimos 365 días.
 
-🔐 2. Persistencia e Idempotencia Concurrente
+#🔐 2. Persistencia e Idempotencia Concurrente
 
 Cada solicitud genera automáticamente un identificador único con el formato:
 
@@ -36,7 +36,7 @@ LockService
 
 Esto permite prevenir condiciones de carrera y sobreescrituras durante las operaciones de escritura.
 
-📥 3. Bandeja Interactiva de Pendientes
+#📥 3. Bandeja Interactiva de Pendientes
 
 Las solicitudes nuevas ingresan automáticamente con el estado:
 
@@ -45,7 +45,7 @@ EN PROCESO
 
 Posteriormente son dirigidas a la bandeja de trabajo correspondiente para que los usuarios con rol de Aprobador puedan gestionarlas.
 
-✅ 4. Dictamen y Auditoría
+#✅ 4. Dictamen y Auditoría
 
 El Aprobador puede gestionar cada solicitud y establecer diferentes estados finales:
 
@@ -59,7 +59,7 @@ Para optimizar las consultas y la actualización de las bandejas se utiliza:
 
 CacheService
 
-📚 5. Historial Consolidado
+#📚 5. Historial Consolidado
 
 El sistema conserva información relevante de cada operación, incluyendo:
 
@@ -70,7 +70,7 @@ Fecha de creación
 Fecha de procesamiento
 Observaciones
 Trazabilidad del proceso
-🗄️ Esquema de Base de Datos
+#🗄️ Esquema de Base de Datos
 
 La aplicación utiliza Google Sheets como fuente de datos principal.
 
@@ -100,8 +100,8 @@ O	Usuario Procesador	Correo del Aprobador
 
 ⚠️ Importante: No cambies los nombres ni el orden de las columnas, ya que el código depende de esta estructura.
 
-⚙️ Instalación y Despliegue
-1️⃣ 📊 Preparar Google Sheets
+#⚙️ Instalación y Despliegue
+#1️⃣ 📊 Preparar Google Sheets
 
 Puedes utilizar la plantilla oficial del proyecto:
 
@@ -112,7 +112,7 @@ Una vez abierta:
 Ve a Archivo → Hacer una copia.
 Guarda la copia en tu Google Drive.
 Verifica que la pestaña Solicitudes tenga la estructura indicada anteriormente.
-2️⃣ 💻 Configurar Google Apps Script
+#2️⃣ 💻 Configurar Google Apps Script
 
 Desde la copia de Google Sheets:
 
@@ -146,7 +146,7 @@ ABC123XYZ456
 
 ⚠️ Importante: utiliza el ID de tu propia copia de Google Sheets y no el de la plantilla original.
 
-3️⃣ 👥 Configurar Usuarios y Roles
+#3️⃣ 👥 Configurar Usuarios y Roles
 
 Si el proyecto utiliza una pestaña Usuarios, registra allí los usuarios autorizados.
 
@@ -168,7 +168,7 @@ Acceso a la bandeja de pendientes.
 Gestión y resolución de solicitudes.
 Consulta del historial general.
 
-4️⃣ 🌐 Publicar como Web App
+#4️⃣ 🌐 Publicar como Web App
 
 En Google Apps Script selecciona:
 
@@ -186,7 +186,7 @@ Haz clic en Implementar.
 Autoriza los permisos solicitados por Google.
 Copia la URL de la Web App.
 Comparte la URL con los usuarios autorizados.
-5️⃣ 📱 AppSheet — Opcional
+#5️⃣ 📱 AppSheet — Opcional
 
 Si deseas disponer de una aplicación móvil, puedes utilizar AppSheet.
 
@@ -206,7 +206,7 @@ pueden agregarse desde:
 
 Data → Tables
 
-🔒 Seguridad y Control de Concurrencia
+#🔒 Seguridad y Control de Concurrencia
 
 El sistema incorpora diferentes mecanismos para mantener la integridad y seguridad de la información.
 
@@ -228,7 +228,7 @@ Mecanismo	Función
 ├── 📄 APP.html
 └── 📄 Estilos.html
 
-🎯 Resultado
+#🎯 Resultado
 
 Una vez completados los pasos anteriores, la aplicación estará disponible como Web App de Google Apps Script, conectada a la instancia de Google Sheets configurada y lista para realizar pruebas de:
 
