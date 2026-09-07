@@ -1,86 +1,151 @@
-# 🛡️ Sistema de Gestión y Aprobación de Rehabilitación de Pólizas
+🛡️ Sistema de Gestión y Aprobación de Rehabilitación de Pólizas
 
 [![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://developers.google.com/apps-script)
 [![AppSheet](https://img.shields.io/badge/AppSheet-1A73E8?style=for-the-badge&logo=google&logoColor=white)](https://about.appsheet.com/)
 [![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=for-the-badge&logo=googleworkspace&logoColor=white)](https://sheets.google.com)
 [![JavaScript](https://img.shields.io/badge/Vanilla%20JS-ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](#)
+Un sistema web centralizado, reactivo e interactivo diseñado para la radicación, validación en tiempo real y gestión administrativa de solicitudes de rehabilitación de pólizas. El sistema conecta una interfaz web ligera con Google Sheets / AppSheet, proporcionando trazabilidad, auditoría y control de acceso basado en roles (RBAC).
 
-Un sistema web centralizado, reactivo e interactivo diseñado para la radicación, validación en tiempo real y gestión administrativa de solicitudes de rehabilitación de pólizas. Este software conecta una interfaz web ligera con la base de datos subyacente en **Google Sheets / AppSheet**, garantizando auditoría total y control de acceso basado en roles (RBAC).
+🚀 Flujo de Trabajo y Funcionalidades
 
----
+Captura y Validación en Tiempo Real
 
-## 🚀 Flujo de Trabajo y Funcionalidades
+El usuario Solicitante radica solicitudes con información de ramo, producto, póliza, fechas, cliente, canal e inconsistencia.
+Se realizan validaciones en segundo plano para consultar rehabilitaciones anteriores del cliente durante los últimos 365 días.
 
-1. **Captura y Validación en Tiempo Real**:
-   - El usuario *Solicitante* radica solicitudes ingresando los datos correspondientes (*Ramo, Producto, Fechas de Recaudo/Anulación, Identificación del Cliente, Canal e Inconsistencia*).
-   - En segundo plano, la interfaz ejecuta consultas al servidor mediante eventos `blur` sobre la póliza para alertar en tiempo real cuántas rehabilitaciones ha tenido el cliente en los últimos **365 días**.
-2. **Persistencia e Idempotencia Concurrente**:
-   - Cada solicitud genera un ID único e irrepetible (formato `REH-XXXXXX`).
-   - Se utiliza **`LockService`** para evitar condiciones de carrera (*Race Conditions*) o sobreescritura cuando múltiples usuarios radican al mismo tiempo.
-3. **Bandeja Interactiva de Pendientes**:
-   - Los registros entran con estado inicial `EN PROCESO` y son enrutados automáticamente a la bandeja de trabajo de los *Aprobadores*.
-4. **Dictamen y Auditoría Integrada**:
-   - El *Aprobador* gestiona las solicitudes permitiendo dictaminar estados finales (`Rehabilitada`, `Rechazada` o `Tramitar con Operaciones`), adjuntando observaciones detalladas.
-   - Se utiliza **`CacheService`** para acelerar el tiempo de respuesta y la actualización visual de las bandejas.
-5. **Historial Consolidado**:
-   - Registro permanente del usuario aprobador, fecha de proceso y traza completa de cambios para fines de auditoría interna.
+Persistencia e Idempotencia Concurrente
 
----
+Cada solicitud genera un ID único con formato REH-XXXXXX.
+LockService evita condiciones de carrera y sobreescrituras cuando existen solicitudes simultáneas.
 
-## 🗄️ Esquema de Base de Datos (Google Sheets)
+Bandeja Interactiva de Pendientes
 
-La pestaña **`Solicitudes`** requiere el siguiente orden de columnas:
+Las solicitudes ingresan con estado EN PROCESO y son dirigidas automáticamente a la bandeja de los Aprobadores.
 
-| Col. | Campo | Descripción |
-| :-: | :--- | :--- |
-| **A** | `ID Solicitud` | Identificador único (`REH-XXXXXX`) |
-| **B** | `Timestamp` | Fecha y hora de creación de la solicitud |
-| **C** | `Ramo` | Ramo asegurador |
-| **D** | `Producto` | Nombre del producto |
-| **E** | `Póliza` | Número de la póliza afectada |
-| **F** | `Cédula Cliente` | Identificación del tomador |
-| **G** | `Fecha Recaudo` | Fecha del pago registrado |
-| **H** | `Fecha Anulación` | Fecha de cancelación de la póliza |
-| **I** | `Canal` | Canal comercial o de atención |
-| **J** | `Inconsistencia` | Detalle o motivo de la anulación |
-| **K** | `Estado` | `EN PROCESO`, `Rehabilitada`, `Rechazada`, etc. |
-| **L** | `Usuario Solicitante` | Correo del creador del registro |
-| **M** | `Observaciones` | Justificación ingresada por el Aprobador |
-| **N** | `Fecha Procesado` | Timestamp de la aprobación/rechazo |
-| **O** | `Usuario Procesador` | Correo del Aprobador |
+Dictamen y Auditoría
 
----
+El Aprobador puede resolver las solicitudes como Rehabilitada, Rechazada o Tramitar con Operaciones, incluyendo observaciones.
+CacheService permite optimizar las consultas y actualización de las bandejas.
 
-## ⚙️ Configuración y Despliegue
+Historial Consolidado
 
-### 1. Preparar Google Sheets
-1. Crea un nuevo libro en **Google Sheets**.
-2. Renombra la pestaña principal como `Solicitudes` y configura los encabezados definidos en el [Esquema de Base de Datos](#️-esquema-de-base-de-datos-google-sheets).
+Se almacena el usuario procesador, fecha de procesamiento y trazabilidad de las solicitudes.
+🗄️ Esquema de Base de Datos — Google Sheets
 
-### 2. Configurar el Proyecto en Apps Script
-1. En Google Sheets, ve a **Extensiones > Apps Script**.
-2. Crea los siguientes archivos y copia sus respectivos códigos:
-   - `Código.gs`
-   - `Constantes.gs`
-   - `APP.html`
-   - `Estilos.html`
-3. Si utilizas un archivo `Constantes.gs` externo, asegúrate de configurar el `SPREADSHEET_ID` y nombres de pestañas según tu entorno.
+La pestaña Solicitudes requiere el siguiente orden de columnas:
 
-### 3. Publicar la Web App
-1. En la esquina superior derecha, haz clic en **Implementar > Nueva implementación**.
-2. Selecciona **Aplicación Web**.
-3. Configura las opciones:
-   - **Ejecutar como**: `Tu usuario (Owner)`
-   - **Quién tiene acceso**: `Usuarios de la organización / Cualquiera con cuenta de Google`
-4. Haz clic en **Implementar** y autoriza los permisos requeridos.
-5. Copia la **URL de la Web App** generada.
+Col.	Campo	Descripción
+A	ID Solicitud	Identificador único (REH-XXXXXX)
+B	Timestamp	Fecha y hora de creación
+C	Ramo	Ramo asegurador
+D	Producto	Nombre del producto
+E	Póliza	Número de póliza
+F	Cédula Cliente	Identificación del cliente
+G	Fecha Recaudo	Fecha del pago
+H	Fecha Anulación	Fecha de cancelación
+I	Canal	Canal comercial o de atención
+J	Inconsistencia	Motivo o detalle de la anulación
+K	Estado	Estado de la solicitud
+L	Usuario Solicitante	Correo del creador
+M	Observaciones	Comentarios del Aprobador
+N	Fecha Procesado	Fecha de procesamiento
+O	Usuario Procesador	Correo del Aprobador
 
----
+⚙️ Instalación y Despliegue
+1. 📊 Preparar Google Sheets
 
-## 🔒 Control de Concurrencia y Seguridad (RBAC)
+Puedes utilizar la plantilla oficial del proyecto:
 
-* **Prevención de colisiones**: `LockService` aplica un bloqueo exclusivo de hasta 10 segundos al momento de escribir o actualizar en la hoja, encolando peticiones simultáneas.
-* **Caché de alto rendimiento**: `CacheService` optimiza las peticiones repetitivas reduciendo los tiempos de llamada a las APIs de Google Sheets.
-* **Roles del Sistema**:
-  * **Solicitante**: Radicación de peticiones y consulta de historial propio.
-  * **Aprobador / Admin**: Acceso a bandeja de pendientes, facultad de resolución y vista del historial general consolidado.
+👉 Abrir plantilla de Google Sheets
+
+En Google Sheets selecciona:
+
+Archivo → Hacer una copia
+
+Verifica que la pestaña Solicitudes y sus columnas coincidan con el esquema anterior.
+
+2. 💻 Configurar Apps Script
+
+Desde la copia de Google Sheets:
+
+Extensiones → Apps Script
+
+Crea o incorpora los archivos del proyecto:
+
+Código.gs
+Constantes.gs
+APP.html
+Estilos.html
+Index.html
+
+
+En Constantes.gs, configura el ID de tu hoja:
+
+const SPREADSHEET_ID = 'TU_ID_DE_GOOGLE_SHEETS';
+
+
+El ID corresponde al valor que aparece en la URL de tu Google Sheet.
+
+⚠️ Utiliza el ID de tu propia copia y no el de la plantilla original.
+
+3. 👥 Configurar usuarios y roles
+
+Si el proyecto utiliza una pestaña Usuarios, registra allí los usuarios autorizados y sus roles.
+
+Ejemplo:
+
+ID	Usuario	Correo	Rol	Estado	Canales
+USR-001	Administrador	usuario@empresa.com	Admin	Activo	Todos
+USR-002	Solicitante	solicitante@empresa.com	Solicitante	Activo	Canal 1
+
+Los roles principales son:
+
+Solicitante: radicación y consulta de sus solicitudes.
+Aprobador/Admin: gestión de pendientes, resolución y consulta del historial.
+
+4. 🌐 Publicar como Web App
+   
+En Apps Script:
+
+Implementar → Nueva implementación → Aplicación web
+
+Configura:
+
+Ejecutar como: Yo / Owner
+Quién tiene acceso: usuarios de la organización o cualquier usuario con cuenta de Google.
+
+Luego:
+
+Haz clic en Implementar.
+Autoriza los permisos solicitados.
+Copia la URL de la Web App.
+Comparte la URL con los usuarios autorizados.
+5. 📱 AppSheet — Opcional
+
+Para utilizar una interfaz móvil:
+
+Google Sheets → Extensiones → AppSheet → Crear una aplicación
+
+AppSheet puede utilizar Solicitudes como fuente principal. Si el proyecto utiliza tablas adicionales como Productos y Usuarios, agrégalas desde:
+
+Data → Tables
+
+🔒 Control de Concurrencia y Seguridad (RBAC)
+Prevención de colisiones: LockService evita escrituras simultáneas sobre los mismos recursos.
+Caché: CacheService reduce consultas repetitivas y mejora los tiempos de respuesta.
+RBAC: los permisos se determinan según el rol y estado del usuario.
+Trazabilidad: cada solicitud conserva información del solicitante, procesador, estado y fechas.
+Acceso: la configuración de la Web App debe ajustarse a las políticas de seguridad de la organización.
+📁 Estructura del Proyecto
+📦 sistema-rehabilitacion
+├── Código.gs
+├── Globales.gs
+├── Index.html
+├── APP.html
+└── Estilos.html
+
+🎯 Resultado
+
+Una vez completados los pasos anteriores, la aplicación estará disponible como Web App de Google Apps Script, conectada a la instancia de Google Sheets configurada y lista para realizar pruebas de radicación, aprobación y seguimiento de solicitudes.
+
+💡 Nota: Para ambientes productivos se recomienda revisar los permisos de acceso, políticas de seguridad, estructura de usuarios y mecanismos de respaldo antes del despliegue definitivo.
